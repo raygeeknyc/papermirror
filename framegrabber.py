@@ -26,8 +26,9 @@ def overlay_image(display, image, color):
         pixel_count += 1
   logging.debug("{} pixels set".format(pixel_count))
 
-RESOLUTION = (600, 400)
+RESOLUTION = (320, 240)
 CAMERA_ERROR_DELAY_SECS = 1
+FRAME_DISPLAY_DELAY_SECS = 5
 
 
 camera = PiCamera()
@@ -59,12 +60,13 @@ def displayImage(display, queue):
                 logging.debug("got the most recent image, skipped over {} images".format(skipped_images))
                 logging.debug("displaying image %s" % id(image))
 		if previous_image:
-                    overlay_image(inky_display, previous_image.load(), inky_display.BLACK)
-                overlay_image(inky_display, image.load(), inky_display.RED)
+                    overlay_image(inky_display, previous_image.load(), inky_display.RED)
+                overlay_image(inky_display, image.load(), inky_display.BLACK)
 
                 previous_image = image
                 image = None
                 inky_display.show()
+		time.sleep(FRAME_DISPLAY_DELAY_SECS)
                 frame_frequency = time.time() - last_start
                 last_start = time.time()
                 frame_rate = 1/frame_frequency
@@ -105,7 +107,10 @@ try:
         logging.debug("Image conversion took {}".format(time.time()-s))
         s = time.time()
         cv2_image = cv2.equalizeHist(cv2_image)
-        #(thresh, cv2_image) = cv2.threshold(cv2_image, 128, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)  # too high contrast
+        image_center = tuple(numpy.array(cv2_image.shape[1::-1]) / 2)
+        rot_mat = cv2.getRotationMatrix2D(image_center, 270, 1.0)
+        cv2_image = cv2.warpAffine(cv2_image, rot_mat, cv2_image.shape[1::-1], flags=cv2.INTER_LINEAR)
+
         cv2_image = cv2.resize(cv2_image, (inky_display.width, inky_display.height))
         display_image = Image.fromarray(cv2_image).convert('1')
         image_buffer.seek(0)
