@@ -1,5 +1,5 @@
 import logging
-logging.getLogger("").setLevel(logging.INFO)
+logging.getLogger("").setLevel(logging.DEBUG)
 
 import time
 import io
@@ -17,13 +17,20 @@ from inky import InkyWHAT, InkyPHAT
 # Set up the correct display and scaling factors
 inky_display = InkyPHAT("red")
 
-def overlay_image(display, image, color):
+def overlay_image(display, image, color, background_color = None):
   pixel_count = 0
-  for x in range(0, display.WIDTH):
-    for y in range(0, display.HEIGHT):
-      if image[x,y]:
-        display.set_pixel(x,y, color)
+  width, height = image.size
+  logging.debug("W, H: {},{}".format(width, height))
+  pixels = image.load()
+  for x in range(0, width):
+    for y in range(0, height):
+      if pixels[x,y]:
+        display.set_pixel(x, y, color)
         pixel_count += 1
+      else:
+        if background_color:
+          display.set_pixel(x, y, background_color)
+
   logging.debug("{} pixels set".format(pixel_count))
 
 RESOLUTION = (320, 240)
@@ -60,12 +67,12 @@ def displayImage(display, queue):
                 logging.debug("got the most recent image, skipped over {} images".format(skipped_images))
                 logging.debug("displaying image %s" % id(image))
 		if previous_image:
-                    overlay_image(inky_display, previous_image.load(), inky_display.RED)
-                overlay_image(inky_display, image.load(), inky_display.BLACK)
+                    overlay_image(inky_display, previous_image, inky_display.RED, inky_display.WHITE)
+#                overlay_image(inky_display, image, inky_display.BLACK)
 
+                inky_display.show()
                 previous_image = image
                 image = None
-                inky_display.show()
 		time.sleep(FRAME_DISPLAY_DELAY_SECS)
                 frame_frequency = time.time() - last_start
                 last_start = time.time()
@@ -110,9 +117,15 @@ try:
         image_center = tuple(numpy.array(cv2_image.shape[1::-1]) / 2)
         rot_mat = cv2.getRotationMatrix2D(image_center, 270, 1.0)
         cv2_image = cv2.warpAffine(cv2_image, rot_mat, cv2_image.shape[1::-1], flags=cv2.INTER_LINEAR)
-
-        cv2_image = cv2.resize(cv2_image, (inky_display.width, inky_display.height))
-        display_image = Image.fromarray(cv2_image).convert('1')
+        new_width =  cv2_image.shape[0]
+        new_height =  int(new_width * (1.0 * new_width / cv2_image.shape[1]))
+        logging.debug("n_w,n_h: {},{}".format(new_width,new_height))
+        x_margin = (cv2_image.shape[1] - new_width)/2
+        y_margin = (cv2_image.shape[0] - new_height)/2
+        logging.debug("x_m,y_m: {},{}".format(x_margin,y_margin))
+        crop_image = cv2_image[y_margin:y_margin + new_height, x_margin:x_margin + new_width]
+        crop_image = cv2.resize(crop_image, (inky_display.WIDTH, inky_display.HEIGHT))
+        display_image = Image.fromarray(crop_image).convert('1')
         image_buffer.seek(0)
         logging.debug("Image processing took {}".format(time.time()-s))
         s = time.time()
