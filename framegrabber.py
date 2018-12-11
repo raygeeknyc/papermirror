@@ -11,27 +11,32 @@ import Queue
 
 from picamera import PiCamera
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from inky import InkyWHAT, InkyPHAT
 # Set up the correct display and scaling factors
-inky_display = InkyPHAT("red")
+inky_display = InkyPHAT("black")
 
-def overlay_image(display, image, color, background_color = None):
+def overlay_image(background_image, image, color, background_color = None):
+  logging.debug("bg color: {}".format(background_color))
   pixel_count = 0
+  bg_pixel_count = 0
+  canvas = ImageDraw.Draw(background_image)
   width, height = image.size
-  logging.debug("W, H: {},{}".format(width, height))
-  pixels = image.load()
+  if image.size != background_image.size:
+    raise ValueError("Image sizes are not the same {},{}".format(background_image.size, image.size))
+  new_pixels = image.load()
   for x in range(0, width):
     for y in range(0, height):
-      if pixels[x,y]:
-        display.set_pixel(x, y, color)
+      if new_pixels[x,y]:
+        canvas.point((x, y), color)
         pixel_count += 1
       else:
-        if background_color:
-          display.set_pixel(x, y, background_color)
-
+        if background_color != None:
+          canvas.point((x, y), background_color)
+          bg_pixel_count += 1
   logging.debug("{} pixels set".format(pixel_count))
+  logging.debug("{} bg pixels set".format(bg_pixel_count))
 
 RESOLUTION = (320, 240)
 CAMERA_ERROR_DELAY_SECS = 1
@@ -66,10 +71,15 @@ def displayImage(display, queue):
                 skipped_images -= 1
                 logging.debug("got the most recent image, skipped over {} images".format(skipped_images))
                 logging.debug("displaying image %s" % id(image))
+                display_image = Image.new("P", (display.WIDTH, display.HEIGHT))
+                #display_image = Image.fromarray(numpy.zeros((display.HEIGHT, display.WIDTH, 3), numpy.uint8))
 		if previous_image:
-                    overlay_image(inky_display, previous_image, inky_display.RED, inky_display.WHITE)
-#                overlay_image(inky_display, image, inky_display.BLACK)
+                    logging.debug("previous_image")
+                    overlay_image(display_image, previous_image, inky_display.RED, inky_display.WHITE)
+                logging.debug("image")
+                overlay_image(display_image, image, inky_display.RED)
 
+                inky_display.set_image(display_image)
                 inky_display.show()
                 previous_image = image
                 image = None
@@ -108,8 +118,8 @@ try:
             time.sleep(CAMERA_ERROR_DELAY_SECS)
             continue
         s = time.time()
-        display_image = Image.open(image_buffer)
-        cv2_image = numpy.array(display_image)
+        frame = Image.open(image_buffer)
+        cv2_image = numpy.array(frame)
         cv2_image = cv2.cvtColor(cv2_image, cv2.COLOR_RGB2GRAY)
         logging.debug("Image conversion took {}".format(time.time()-s))
         s = time.time()
@@ -125,11 +135,11 @@ try:
         logging.debug("x_m,y_m: {},{}".format(x_margin,y_margin))
         crop_image = cv2_image[y_margin:y_margin + new_height, x_margin:x_margin + new_width]
         crop_image = cv2.resize(crop_image, (inky_display.WIDTH, inky_display.HEIGHT))
-        display_image = Image.fromarray(crop_image).convert('1')
+        frame = Image.fromarray(crop_image).convert('1')
         image_buffer.seek(0)
         logging.debug("Image processing took {}".format(time.time()-s))
         s = time.time()
-        image_queue.put(display_image)
+        image_queue.put(frame)
         logging.debug("Image queuing took {}".format(time.time()-s))
         frame_frequency = time.time() - last_start
         last_start = time.time()
