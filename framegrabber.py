@@ -75,9 +75,9 @@ def displayImage(display, queue):
                 #display_image = Image.fromarray(numpy.zeros((display.HEIGHT, display.WIDTH, 3), numpy.uint8))
 		if previous_image:
                     logging.debug("previous_image")
-                    overlay_image(display_image, previous_image, inky_display.RED, inky_display.WHITE)
+                    overlay_image(display_image, previous_image, inky_display.BLACK, inky_display.WHITE)
                 logging.debug("image")
-                overlay_image(display_image, image, inky_display.RED)
+                overlay_image(display_image, image, inky_display.BLACK)
 
                 inky_display.set_image(display_image)
                 inky_display.show()
