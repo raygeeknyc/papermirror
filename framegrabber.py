@@ -1,5 +1,5 @@
 import logging
-logging.getLogger("").setLevel(logging.DEBUG)
+logging.getLogger("").setLevel(logging.INFO)
 
 import time
 import io
