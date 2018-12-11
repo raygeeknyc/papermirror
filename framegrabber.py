@@ -15,25 +15,24 @@ from PIL import Image, ImageDraw
 
 from inky import InkyWHAT, InkyPHAT
 # Set up the correct display and scaling factors
-inky_display = InkyPHAT("black")
+inky_display = InkyPHAT("red")
 
-def overlay_image(background_image, image, color, background_color = None):
-  logging.debug("bg color: {}".format(background_color))
+def overlay_image(display, image, color, background_color = None):
+  logging.debug("Color: {} bg color: {}".format(color, background_color))
   pixel_count = 0
   bg_pixel_count = 0
-  canvas = ImageDraw.Draw(background_image)
   width, height = image.size
-  if image.size != background_image.size:
-    raise ValueError("Image sizes are not the same {},{}".format(background_image.size, image.size))
+  if image.size != (display.WIDTH, display.HEIGHT):
+    raise ValueError("Image size {} does not match the display {}".format(image.size, (display.WIDTH, display.HEIGHT)))
   new_pixels = image.load()
   for x in range(0, width):
     for y in range(0, height):
       if new_pixels[x,y]:
-        canvas.point((x, y), color)
+        display.set_pixel(x, y, color)
         pixel_count += 1
       else:
         if background_color != None:
-          canvas.point((x, y), background_color)
+          display.set_pixel(x, y, background_color)
           bg_pixel_count += 1
   logging.debug("{} pixels set".format(pixel_count))
   logging.debug("{} bg pixels set".format(bg_pixel_count))
@@ -71,15 +70,12 @@ def displayImage(display, queue):
                 skipped_images -= 1
                 logging.debug("got the most recent image, skipped over {} images".format(skipped_images))
                 logging.debug("displaying image %s" % id(image))
-                display_image = Image.new("P", (display.WIDTH, display.HEIGHT))
-                #display_image = Image.fromarray(numpy.zeros((display.HEIGHT, display.WIDTH, 3), numpy.uint8))
 		if previous_image:
                     logging.debug("previous_image")
-                    overlay_image(display_image, previous_image, inky_display.BLACK, inky_display.WHITE)
+                    overlay_image(inky_display, previous_image, inky_display.RED, inky_display.WHITE)
                 logging.debug("image")
-                overlay_image(display_image, image, inky_display.BLACK)
+                overlay_image(inky_display, image, inky_display.BLACK)
 
-                inky_display.set_image(display_image)
                 inky_display.show()
                 previous_image = image
                 image = None
