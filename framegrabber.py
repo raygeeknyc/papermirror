@@ -40,6 +40,7 @@ def overlay_image(display, image, color, background_color = None):
 RESOLUTION = (320, 240)
 CAMERA_ERROR_DELAY_SECS = 1
 FRAME_DISPLAY_DELAY_SECS = 5
+FRAME_DISPLAY_SHIFT_SECS = 2
 
 
 camera = PiCamera()
@@ -70,13 +71,13 @@ def displayImage(display, queue):
                 skipped_images -= 1
                 logging.debug("got the most recent image, skipped over {} images".format(skipped_images))
                 logging.debug("displaying image %s" % id(image))
-		if previous_image:
-                    logging.debug("previous_image")
-                    overlay_image(inky_display, previous_image, inky_display.RED, inky_display.WHITE)
                 logging.debug("image")
-                overlay_image(inky_display, image, inky_display.BLACK)
-
+                overlay_image(inky_display, image, inky_display.RED)
                 inky_display.show()
+		time.sleep(FRAME_DISPLAY_SHIFT_SECS)
+                overlay_image(inky_display, image, inky_display.BLACK)
+                inky_display.show()
+
                 previous_image = image
                 image = None
 		time.sleep(FRAME_DISPLAY_DELAY_SECS)
