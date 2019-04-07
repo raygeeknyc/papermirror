@@ -72,10 +72,15 @@ def displayImage(display, queue):
                 logging.debug("got the most recent image, skipped over {} images".format(skipped_images))
                 logging.debug("displaying image %s" % id(image))
                 logging.debug("image")
-                overlay_image(inky_display, image, inky_display.RED)
+		if previous_image == None:
+			previous_image = image
+                overlay_image(inky_display, previous_image, inky_display.RED)
                 inky_display.show()
 		time.sleep(FRAME_DISPLAY_SHIFT_SECS)
                 overlay_image(inky_display, image, inky_display.BLACK)
+                inky_display.show()
+		time.sleep(FRAME_DISPLAY_SHIFT_SECS)
+                overlay_image(inky_display, image, inky_display.BLACK, inky_display.WHITE)
                 inky_display.show()
 
                 previous_image = image
