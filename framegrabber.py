@@ -58,17 +58,19 @@ def motionDetected(image1, image2, pixel_tolerance_percent, sample_percentage=MO
 		return True
 	sample_delta_threshold = pixel_tolerance_percent * sample_percentage
         s=time.time()
-        pixel_step = int((RESOLUTION[0] * RESOLUTION[1])/(sample_percentage * RESOLUTION[0] * RESOLUTION[1]))
+	width, height = image1.size
         current_pixels = image1.load()
         prev_pixels = image2.load()
-	width, height = image1.size
+        pixel_step = int((width * height)/(sample_percentage * width * height))
 	pixel_tolerance = int(sample_delta_threshold * width * height)
+	sampled_pixels = 0
         changed_pixels = 0
         for pixel_index in xrange(0, width*height, pixel_step):
+	    sampled_pixels += 1
             if abs(int(current_pixels[pixel_index/height,pixel_index%height]) - int(prev_pixels[pixel_index/height,pixel_index%height])) >= PIXEL_SHIFT_SENSITIVITY:
                 changed_pixels += 1
                 if changed_pixels > pixel_tolerance:
-                  logging.info("Image diff {} of {}".format(changed_pixels, pixel_tolerance))
+                  logging.info("Image diff {} of {}".format(changed_pixels, sampled_pixels))
                   return True
         logging.info("Images equal {}".format(changed_pixels)) 
         return False
