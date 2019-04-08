@@ -39,14 +39,52 @@ def overlay_image(display, image, color, background_color = None):
 
 RESOLUTION = (320, 240)
 CAMERA_ERROR_DELAY_SECS = 1
-FRAME_DISPLAY_DELAY_SECS = 5
-FRAME_DISPLAY_SHIFT_SECS = 2
+FRAME_DISPLAY_DELAY_SECS = 1
+FRAME_DISPLAY_SHIFT_SECS = 1
+PIXEL_SHIFT_SENSITIVITY = 1
 
 
 camera = PiCamera()
 camera.resolution = RESOLUTION
 camera.vflip = False
 image_buffer = io.BytesIO()
+MOTION_DETECT_SAMPLE_PCT = 0.10
+MOTION_DETECTION_DELTA_THRESHOLD_PCT = 0.25
+
+def motionDetected(image1, image2, pixel_tolerance_percent, sample_percentage=MOTION_DETECT_SAMPLE_PCT):
+	if not image1 and not image2:
+		return False
+	if not image1 or not image2:
+		return True
+	sample_delta_threshold = pixel_tolerance_percent * sample_percentage
+        s=time.time()
+        pixel_step = int((RESOLUTION[0] * RESOLUTION[1])/(sample_percentage * RESOLUTION[0] * RESOLUTION[1]))
+        current_pixels = image1.load()
+        prev_pixels = image2.load()
+	width, height = image1.size
+	pixel_tolerance = int(sample_delta_threshold * width * height)
+        changed_pixels = 0
+        for pixel_index in xrange(0, width*height, pixel_step):
+            if abs(int(current_pixels[pixel_index/height,pixel_index%height]) - int(prev_pixels[pixel_index/height,pixel_index%height])) >= PIXEL_SHIFT_SENSITIVITY:
+                changed_pixels += 1
+                if changed_pixels > pixel_tolerance:
+                  logging.info("Image diff {} of {}".format(changed_pixels, pixel_tolerance))
+                  return True
+        logging.info("Images equal {}".format(changed_pixels)) 
+        return False
+
+def displayTransition(inky_display, previous_image, image):
+	if previous_image != None:
+		overlay_image(inky_display, previous_image, inky_display.RED)
+		inky_display.show()
+		time.sleep(FRAME_DISPLAY_SHIFT_SECS)
+	if image != None:
+		overlay_image(inky_display, image, inky_display.BLACK)
+		inky_display.show()
+		time.sleep(FRAME_DISPLAY_SHIFT_SECS)
+		overlay_image(inky_display, image, inky_display.BLACK, inky_display.WHITE)
+		inky_display.show()
+		time.sleep(FRAME_DISPLAY_DELAY_SECS)
 
 def displayImage(display, queue):
     global STOP
@@ -72,20 +110,10 @@ def displayImage(display, queue):
                 logging.debug("got the most recent image, skipped over {} images".format(skipped_images))
                 logging.debug("displaying image %s" % id(image))
                 logging.debug("image")
-		if previous_image == None:
-			previous_image = image
-                overlay_image(inky_display, previous_image, inky_display.RED)
-                inky_display.show()
-		time.sleep(FRAME_DISPLAY_SHIFT_SECS)
-                overlay_image(inky_display, image, inky_display.BLACK)
-                inky_display.show()
-		time.sleep(FRAME_DISPLAY_SHIFT_SECS)
-                overlay_image(inky_display, image, inky_display.BLACK, inky_display.WHITE)
-                inky_display.show()
-
-                previous_image = image
-                image = None
-		time.sleep(FRAME_DISPLAY_DELAY_SECS)
+		if motionDetected(previous_image, image, MOTION_DETECTION_DELTA_THRESHOLD_PCT):
+			displayTransition(inky_display, previous_image, image)
+               	previous_image = image
+               	image = None
                 frame_frequency = time.time() - last_start
                 last_start = time.time()
                 frame_rate = 1/frame_frequency
