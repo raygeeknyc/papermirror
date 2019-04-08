@@ -112,8 +112,7 @@ def displayImage(display, queue):
                 logging.debug("got the most recent image, skipped over {} images".format(skipped_images))
                 logging.debug("displaying image %s" % id(image))
                 logging.debug("image")
-		if motionDetected(previous_image, image, MOTION_DETECTION_DELTA_THRESHOLD_PCT):
-			displayTransition(inky_display, previous_image, image)
+		displayTransition(inky_display, previous_image, image)
                	previous_image = image
                	image = None
                 frame_frequency = time.time() - last_start
@@ -140,6 +139,7 @@ try:
     last_report_at = time.time()
     last_start = time.time()
     s = time.time()
+    previous_frame = None
     for _ in camera.capture_continuous(image_buffer, format='jpeg', use_video_port=True):
         try:
             image_buffer.truncate()
@@ -165,14 +165,16 @@ try:
         x_margin = (cv2_image.shape[1] - new_width)/2
         y_margin = (cv2_image.shape[0] - new_height)/2
         logging.debug("x_m,y_m: {},{}".format(x_margin,y_margin))
-        crop_image = cv2_image[y_margin:y_margin + new_height, x_margin:x_margin + new_width]
-        crop_image = cv2.resize(crop_image, (inky_display.WIDTH, inky_display.HEIGHT))
-        frame = Image.fromarray(crop_image).convert('1')
+        cropped_color_image = cv2_image[y_margin:y_margin + new_height, x_margin:x_margin + new_width]
+        cropped_color_image = cv2.resize(cropped_color_image, (inky_display.WIDTH, inky_display.HEIGHT))
+        frame = Image.fromarray(cropped_color_image).convert('1')
         image_buffer.seek(0)
         logging.debug("Image processing took {}".format(time.time()-s))
-        s = time.time()
-        image_queue.put(frame)
-        logging.debug("Image queuing took {}".format(time.time()-s))
+	if motionDetected(previous_frame, frame, MOTION_DETECTION_DELTA_THRESHOLD_PCT):
+        	s = time.time()
+        	image_queue.put(frame)
+        	logging.debug("Image queuing took {}".format(time.time()-s))
+	previous_frame = frame
         frame_frequency = time.time() - last_start
         last_start = time.time()
         frame_rate = 1/frame_frequency
