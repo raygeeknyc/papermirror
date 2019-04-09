@@ -41,7 +41,7 @@ RESOLUTION = (320, 240)
 CAMERA_ERROR_DELAY_SECS = 1
 FRAME_DISPLAY_DELAY_SECS = 1
 FRAME_DISPLAY_SHIFT_SECS = 1
-PIXEL_SHIFT_SENSITIVITY = 1
+PIXEL_SHIFT_SENSITIVITY = 20  # The threshold within which a pixel's channel changes are ignored
 
 
 camera = PiCamera()
@@ -50,24 +50,25 @@ camera.vflip = False
 image_buffer = io.BytesIO()
 MOTION_DETECT_SAMPLE_PCT = 0.10
 MOTION_DETECTION_DELTA_THRESHOLD_PCT = 0.25
+COMPARE_CHANNEL = 1  # compare the green channel of RGB images
 
-def motionDetected(image1, image2, pixel_tolerance_percent, sample_percentage=MOTION_DETECT_SAMPLE_PCT):
+def motionDetected(cv2_image1, cv2_image2, pixel_tolerance_percent, sample_percentage=MOTION_DETECT_SAMPLE_PCT):
 	if not image1 and not image2:
 		return False
 	if not image1 or not image2:
 		return True
 	sample_delta_threshold = pixel_tolerance_percent * sample_percentage
         s=time.time()
-	width, height = image1.size
-        current_pixels = image1.load()
-        prev_pixels = image2.load()
+	height, width = image1.shape
+        current_pixels = image2
+        prev_pixels = image1
         pixel_step = int((width * height)/(sample_percentage * width * height))
 	pixel_tolerance = int(sample_delta_threshold * width * height)
 	sampled_pixels = 0
         changed_pixels = 0
         for pixel_index in xrange(0, width*height, pixel_step):
 	    sampled_pixels += 1
-            if abs(int(current_pixels[pixel_index/height,pixel_index%height]) - int(prev_pixels[pixel_index/height,pixel_index%height])) >= PIXEL_SHIFT_SENSITIVITY:
+            if abs(int(current_pixels[pixel_index%height,pixel_index/height][COMPARE_CHANNEL]) - int(prev_pixels[pixel_index%height,pixel_index/height][COMPARE_CHANNEL])) >= PIXEL_SHIFT_SENSITIVITY:
                 changed_pixels += 1
                 if changed_pixels > pixel_tolerance:
                   logging.info("Image diff {} of {}".format(changed_pixels, sampled_pixels))
@@ -139,7 +140,7 @@ try:
     last_report_at = time.time()
     last_start = time.time()
     s = time.time()
-    previous_frame = None
+    prev_cv2_rgb_image = None
     for _ in camera.capture_continuous(image_buffer, format='jpeg', use_video_port=True):
         try:
             image_buffer.truncate()
@@ -151,30 +152,30 @@ try:
             continue
         s = time.time()
         frame = Image.open(image_buffer)
-        cv2_image = numpy.array(frame)
-        cv2_image = cv2.cvtColor(cv2_image, cv2.COLOR_RGB2GRAY)
+        cv2_rgb_image = numpy.array(frame)
         logging.debug("Image conversion took {}".format(time.time()-s))
         s = time.time()
-        cv2_image = cv2.equalizeHist(cv2_image)
-        image_center = tuple(numpy.array(cv2_image.shape[1::-1]) / 2)
-        rot_mat = cv2.getRotationMatrix2D(image_center, 270, 1.0)
-        cv2_image = cv2.warpAffine(cv2_image, rot_mat, cv2_image.shape[1::-1], flags=cv2.INTER_LINEAR)
-        new_width =  cv2_image.shape[0]
-        new_height =  int(new_width * (1.0 * new_width / cv2_image.shape[1]))
-        logging.debug("n_w,n_h: {},{}".format(new_width,new_height))
-        x_margin = (cv2_image.shape[1] - new_width)/2
-        y_margin = (cv2_image.shape[0] - new_height)/2
-        logging.debug("x_m,y_m: {},{}".format(x_margin,y_margin))
-        cropped_color_image = cv2_image[y_margin:y_margin + new_height, x_margin:x_margin + new_width]
-        cropped_color_image = cv2.resize(cropped_color_image, (inky_display.WIDTH, inky_display.HEIGHT))
-        frame = Image.fromarray(cropped_color_image).convert('1')
-        image_buffer.seek(0)
-        logging.debug("Image processing took {}".format(time.time()-s))
-	if motionDetected(previous_frame, frame, MOTION_DETECTION_DELTA_THRESHOLD_PCT):
+        cv2_rgb_image = cv2.equalizeHist(cv2_rgb_image)
+	if motionDetected(prev_cv2_rgb_image, cv2_rgb_image, MOTION_DETECTION_DELTA_THRESHOLD_PCT):
+		prev_cv2_rgb_image = cv2_rgb_image
+        	cv2_grayscale_image = cv2.cvtColor(cv2_rgb_image, cv2.COLOR_RGB2GRAY)
+        	image_center = tuple(numpy.array(cv2_rgb_image.shape[1::-1]) / 2)
+        	rot_mat = cv2.getRotationMatrix2D(image_center, 270, 1.0)
+        	cv2_grayscale_image = cv2.warpAffine(cv2_grayscale_image, rot_mat, cv2_grayscale_image.shape[1::-1], flags=cv2.INTER_LINEAR)
+        	new_width =  cv2_grayscale_image.shape[0]
+        	new_height =  int(new_width * (1.0 * new_width / cv2_grayscale_image.shape[1]))
+        	logging.debug("n_w,n_h: {},{}".format(new_width,new_height))
+        	x_margin = (cv2_grayscale_image.shape[1] - new_width)/2
+        	y_margin = (cv2_grayscale_image.shape[0] - new_height)/2
+        	logging.debug("x_m,y_m: {},{}".format(x_margin,y_margin))
+        	cropped_grayscale_image = cv2_grayscale_image[y_margin:y_margin + new_height, x_margin:x_margin + new_width]
+        	cropped_grayscale_image = cv2.resize(cropped_grayscale_image, (inky_display.WIDTH, inky_display.HEIGHT))
+        	frame = Image.fromarray(cropped_grayscale_image).convert('1')
+        	image_buffer.seek(0)
+        	logging.debug("Image processing took {}".format(time.time()-s))
         	s = time.time()
         	image_queue.put(frame)
         	logging.debug("Image queuing took {}".format(time.time()-s))
-	previous_frame = frame
         frame_frequency = time.time() - last_start
         last_start = time.time()
         frame_rate = 1/frame_frequency
