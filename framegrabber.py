@@ -63,6 +63,7 @@ def motionDetected(image1, image2, pixel_tolerance_percent, sample_percentage=MO
         prev_pixels = image2.load()
         pixel_step = int((width * height)/(sample_percentage * width * height))
 	pixel_tolerance = int(sample_delta_threshold * width * height)
+	pixel_tolerance = width * height + 1
 	sampled_pixels = 0
         changed_pixels = 0
         for pixel_index in xrange(0, width*height, pixel_step):
@@ -72,7 +73,7 @@ def motionDetected(image1, image2, pixel_tolerance_percent, sample_percentage=MO
                 if changed_pixels > pixel_tolerance:
                   logging.info("Image diff {} of {}".format(changed_pixels, sampled_pixels))
                   return True
-        logging.info("Images equal {}".format(changed_pixels)) 
+        logging.info("Images equal: {} diff of {} sampled".format(changed_pixels, sampled_pixels)) 
         return False
 
 def displayTransition(inky_display, previous_image, image):
