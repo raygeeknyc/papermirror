@@ -53,17 +53,24 @@ MOTION_DETECTION_DELTA_THRESHOLD_PCT = 0.25
 COMPARE_CHANNEL = 1  # compare the green channel of RGB images
 
 def motionDetected(cv2_image1, cv2_image2, pixel_tolerance_percent, sample_percentage=MOTION_DETECT_SAMPLE_PCT):
-	if not image1 and not image2:
+	if cv2_image1 is None and cv2_image2 is None:
+		logging.debug("no images")
 		return False
-	if not image1 or not image2:
+	if cv2_image1 is None or cv2_image2 is None:
+		logging.debug("only one image")
 		return True
+	if cv2_image1 is cv2_image2:
+		logging.error("same image")
+		return False
 	sample_delta_threshold = pixel_tolerance_percent * sample_percentage
         s=time.time()
-	height, width = image1.shape
-        current_pixels = image2
-        prev_pixels = image1
+	height, width, _ = cv2_image1.shape
+	logging.debug("h,w: {},{}".format(height,width))
+        current_pixels = cv2_image2
+        prev_pixels = cv2_image1
         pixel_step = int((width * height)/(sample_percentage * width * height))
 	pixel_tolerance = int(sample_delta_threshold * width * height)
+	logging.debug("delta threshold: {} pixel tolerance: {}".format(sample_delta_threshold, pixel_tolerance))
 	sampled_pixels = 0
         changed_pixels = 0
         for pixel_index in xrange(0, width*height, pixel_step):
@@ -71,9 +78,9 @@ def motionDetected(cv2_image1, cv2_image2, pixel_tolerance_percent, sample_perce
             if abs(int(current_pixels[pixel_index%height,pixel_index/height][COMPARE_CHANNEL]) - int(prev_pixels[pixel_index%height,pixel_index/height][COMPARE_CHANNEL])) >= PIXEL_SHIFT_SENSITIVITY:
                 changed_pixels += 1
                 if changed_pixels > pixel_tolerance:
-                  logging.info("Image diff {} of {}".format(changed_pixels, sampled_pixels))
+                  logging.debug("Image diff {} of {}".format(changed_pixels, sampled_pixels))
                   return True
-        logging.info("Images equal: {} diff of {} sampled".format(changed_pixels, sampled_pixels)) 
+        logging.debug("Images equal: {} diff of {} sampled".format(changed_pixels, sampled_pixels)) 
         return False
 
 def displayTransition(inky_display, previous_image, image):
@@ -155,11 +162,12 @@ try:
         cv2_rgb_image = numpy.array(frame)
         logging.debug("Image conversion took {}".format(time.time()-s))
         s = time.time()
-        cv2_rgb_image = cv2.equalizeHist(cv2_rgb_image)
 	if motionDetected(prev_cv2_rgb_image, cv2_rgb_image, MOTION_DETECTION_DELTA_THRESHOLD_PCT):
+		logging.debug("motion detected")
 		prev_cv2_rgb_image = cv2_rgb_image
         	cv2_grayscale_image = cv2.cvtColor(cv2_rgb_image, cv2.COLOR_RGB2GRAY)
-        	image_center = tuple(numpy.array(cv2_rgb_image.shape[1::-1]) / 2)
+        	cv2_grayscale_image = cv2.equalizeHist(cv2_grayscale_image)
+        	image_center = tuple(numpy.array(cv2_grayscale_image.shape[1::-1]) / 2)
         	rot_mat = cv2.getRotationMatrix2D(image_center, 270, 1.0)
         	cv2_grayscale_image = cv2.warpAffine(cv2_grayscale_image, rot_mat, cv2_grayscale_image.shape[1::-1], flags=cv2.INTER_LINEAR)
         	new_width =  cv2_grayscale_image.shape[0]
@@ -170,12 +178,12 @@ try:
         	logging.debug("x_m,y_m: {},{}".format(x_margin,y_margin))
         	cropped_grayscale_image = cv2_grayscale_image[y_margin:y_margin + new_height, x_margin:x_margin + new_width]
         	cropped_grayscale_image = cv2.resize(cropped_grayscale_image, (inky_display.WIDTH, inky_display.HEIGHT))
-        	frame = Image.fromarray(cropped_grayscale_image).convert('1')
-        	image_buffer.seek(0)
+        	b_w_image = Image.fromarray(cropped_grayscale_image).convert('1')
         	logging.debug("Image processing took {}".format(time.time()-s))
         	s = time.time()
-        	image_queue.put(frame)
+        	image_queue.put(b_w_image)
         	logging.debug("Image queuing took {}".format(time.time()-s))
+        image_buffer.seek(0)
         frame_frequency = time.time() - last_start
         last_start = time.time()
         frame_rate = 1/frame_frequency
@@ -189,7 +197,7 @@ try:
             last_report_at = last_start 
         s = time.time()
 except KeyboardInterrupt:
-        logging.info("interrupted, exiting")
+        logging.warning("interrupted, exiting")
         STOP = True
         camera.close()
         sys.exit()
