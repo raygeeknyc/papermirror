@@ -27,7 +27,7 @@ def overlay_image(display, image, color, background_color = None):
   new_pixels = image.load()
   for x in range(0, width):
     for y in range(0, height):
-      if new_pixels[x,y]:
+      if not new_pixels[x,y]:
         display.set_pixel(x, y, color)
         pixel_count += 1
       else:
