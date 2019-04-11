@@ -96,7 +96,7 @@ def displayTransition(inky_display, previous_image, image):
 		inky_display.show()
 		time.sleep(FRAME_DISPLAY_DELAY_SECS)
 
-def displayImage(display, queue):
+def showImages(display, queue):
     global STOP
 
     image = None
@@ -139,7 +139,7 @@ global STOP
 STOP = False
 try:
     image_queue = Queue.Queue()
-    displayer = threading.Thread(target=displayImage, args=(inky_display, image_queue,))
+    displayer = threading.Thread(target=showImages, args=(inky_display, image_queue,))
     displayer.start()
 
     frame_count = 0
