@@ -41,6 +41,7 @@ RESOLUTION = (320, 240)
 CAMERA_ERROR_DELAY_SECS = 1
 FRAME_DISPLAY_DELAY_SECS = 1
 FRAME_DISPLAY_SHIFT_SECS = 1
+MIN_IMAGE_DISPLAY_SECS = 60
 PIXEL_SHIFT_SENSITIVITY = 20  # The threshold within which a pixel's channel changes are ignored
 
 
@@ -106,8 +107,13 @@ def showImages(display, queue):
     last_report_at = time.time()
     fps = 0
     frame_count = 0
+    last_displayed_at = 0
     while not STOP:
         try:
+            frame_retention_delay = MIN_IMAGE_DISPLAY_SECS - (time.time() - last_displayed_at)
+            if frame_retention_delay > 0:
+                logging.info("pausing image display for %d seconds" % frame_retention_delay)
+                time.sleep(frame_retention_delay)
             image = image_queue.get(False)
             skipped_images += 1
             logging.debug("Image queue had an entry")
@@ -121,6 +127,7 @@ def showImages(display, queue):
                 logging.debug("displaying image %s" % id(image))
                 logging.debug("image")
 		displayTransition(inky_display, previous_image, image)
+                last_displayed_at = time.time()
                	previous_image = image
                	image = None
                 frame_frequency = time.time() - last_start
